@@ -4,10 +4,10 @@ import { clearSession, getToken } from "./auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
-export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+async function request<T>(path: string, method: "GET" | "POST", body?: unknown): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
+    method,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -31,3 +31,6 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   }
   return (await res.json()) as T;
 }
+
+export const apiGet = <T>(path: string) => request<T>(path, "GET");
+export const apiPost = <T>(path: string, body?: unknown) => request<T>(path, "POST", body);

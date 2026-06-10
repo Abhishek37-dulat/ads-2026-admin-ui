@@ -3,7 +3,8 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell } from "./AppShell";
-import { getToken } from "@/lib/auth";
+import { apiGet } from "@/lib/api";
+import { clearSession, getToken } from "@/lib/auth";
 
 /** Admin session gate. Without a token the only reachable route is /login. */
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -13,14 +14,30 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
-    const check = () => setAuthed(!!getToken());
-    check();
-    setReady(true);
-    window.addEventListener("relay-admin-auth", check);
-    window.addEventListener("storage", check);
+    const check = async () => {
+      if (!getToken()) {
+        setAuthed(false);
+        setReady(true);
+        return;
+      }
+      try {
+        const me = await apiGet<{ admin: boolean }>("/v1/auth/me");
+        if (!me.admin) throw new Error("Admin access required");
+        setAuthed(true);
+      } catch {
+        if (getToken()) clearSession();
+        setAuthed(false);
+      } finally {
+        setReady(true);
+      }
+    };
+    void check();
+    const onSessionChange = () => void check();
+    window.addEventListener("relay-admin-auth", onSessionChange);
+    window.addEventListener("storage", onSessionChange);
     return () => {
-      window.removeEventListener("relay-admin-auth", check);
-      window.removeEventListener("storage", check);
+      window.removeEventListener("relay-admin-auth", onSessionChange);
+      window.removeEventListener("storage", onSessionChange);
     };
   }, []);
 
